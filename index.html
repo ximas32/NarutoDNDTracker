@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2312141a'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23e8903a' stroke-width='5'/%3E%3Cpath d='M32 13a19 19 0 0 1 0 38a9.5 9.5 0 0 0 0-19a9.5 9.5 0 0 1 0-19z' fill='%23e8903a'/%3E%3C/svg%3E">
 <title>Kampf-Tracker</title>
 <style>
 :root{
@@ -153,6 +154,7 @@ label.f span{display:block;font-size:12px;color:var(--tx2);margin-bottom:3px}
         <button class="btn-sm" onclick="rollInit()">W20 für Gegner würfeln</button>
         <button class="btn-sm" onclick="sortInit()">Nach Wert sortieren</button>
       </div>
+      <button class="btn-sm" style="width:100%;margin-top:8px" onclick="openAdd()">Gegner hinzufügen</button>
     </div>
     <div id="kInitList"></div>
     <button class="btn-acc" style="width:100%;min-height:54px;font-size:18px" onclick="startCombat()">Kampf starten</button>
@@ -226,8 +228,7 @@ const PRESETS = [
  ]},
  {name:"Endkampf — Phase 1", enemies:[
    {name:"Marionette Yanis",count:1,ac:15,hp:60,chakra:null,ini:5,note:"2 Angriffe +7, je 1W8+4. Genjutsu ohne Save. Bewegung 15 m. Holt zu Zugbeginn eine gefallene kleine Puppe mit 6 HP zurück",thrHp:null,thrTxt:"",reserve:false},
-   {name:"Kleine Puppe",count:4,ac:13,hp:12,chakra:null,ini:2,note:"Angriff +5, 1W6+2. Immun gegen Gift und Genjutsu",thrHp:null,thrTxt:"",reserve:false},
-   {name:"Kazen",count:1,ac:16,hp:90,chakra:40,ini:3,note:"Phase 1: greift nicht an, ist unerreichbar. Angriff +7, SG 14",thrHp:null,thrTxt:"",reserve:false}
+   {name:"Kleine Puppe",count:4,ac:13,hp:12,chakra:null,ini:2,note:"Angriff +5, 1W6+2. Immun gegen Gift und Genjutsu",thrHp:null,thrTxt:"",reserve:false}
  ]},
  {name:"Endkampf — Phase 2", enemies:[
    {name:"Feuerspucker-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Kegel 4,5 m, DEX-SG 13, 2W6 Feuer",thrHp:null,thrTxt:"",reserve:false},
@@ -235,7 +236,8 @@ const PRESETS = [
    {name:"Gift-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, CON-SG 13 → vergiftet",thrHp:null,thrTxt:"",reserve:false},
    {name:"Blitz-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, Ziel verliert Reaktion",thrHp:null,thrTxt:"",reserve:true},
    {name:"Erd-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W8+3",thrHp:null,thrTxt:"",reserve:true},
-   {name:"Wasser-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, Ziel 3 m ziehen",thrHp:null,thrTxt:"",reserve:true}
+   {name:"Wasser-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, Ziel 3 m ziehen",thrHp:null,thrTxt:"",reserve:true},
+   {name:"Kazen",count:1,ac:16,hp:90,chakra:40,ini:3,note:"Phase 1: greift nicht an, ist unerreichbar. Angriff +7, SG 14",thrHp:null,thrTxt:"",reserve:false}
  ]},
  {name:"Weitere Gegner", enemies:[
    {name:"Suna-Patrouillen-Ninja",count:1,ac:15,hp:34,chakra:null,ini:3,note:"Angriff +5, 1W8+2. Nimmt gefangen statt zu töten",thrHp:null,thrTxt:"",reserve:false}
@@ -255,12 +257,23 @@ function load(){
     if(raw){ const d = JSON.parse(raw); S = Object.assign({players:[],scenes:[],combat:null}, d); }
   }catch(e){ toast("Gespeicherte Daten unlesbar — starte leer"); }
   if(!S.scenes.length) seedPresets();
+  migrate();
 }
 function seedPresets(){
   PRESETS.forEach(p=>{
     S.scenes.push({id:uid(), name:p.name, enemies:p.enemies.map(e=>Object.assign({id:uid()},e))});
   });
   save();
+}
+function migrate(){
+  if(S.v>=2){ return; }
+  const p1 = S.scenes.find(s=>s.name==="Endkampf — Phase 1");
+  const p2 = S.scenes.find(s=>s.name==="Endkampf — Phase 2");
+  if(p1 && p2){
+    const i = p1.enemies.findIndex(e=>e.name==="Kazen");
+    if(i>=0 && !p2.enemies.some(e=>e.name==="Kazen")) p2.enemies.push(p1.enemies.splice(i,1)[0]);
+  }
+  S.v = 2; save();
 }
 function loadPreset(){
   const miss = PRESETS.filter(p=>!S.scenes.some(s=>s.name===p.name));
@@ -459,6 +472,16 @@ function importJson(){
 }
 
 /* ======================= Initiative-Vorbereitung ======================= */
+function tplOf(sid, eid){
+  const sc = sceneById(sid);
+  let t = sc && sc.enemies.find(e=>e.id===eid);
+  if(t) return t;
+  for(let i=0;i<S.scenes.length;i++){
+    t = S.scenes[i].enemies.find(e=>e.id===eid);
+    if(t) return t;
+  }
+  return null;
+}
 function prepCombat(sid){
   const s = sceneById(sid);
   const act = S.players.filter(p=>p.on);
@@ -469,8 +492,8 @@ function prepCombat(sid){
   s.enemies.filter(e=>!e.reserve).forEach(e=>{
     const n = Math.max(1, e.count||1);
     for(let i=0;i<n;i++){
-      list.push({id:uid(), type:"enemy", tplId:e.id, name: n>1 ? e.name+" "+(i+1) : e.name,
-        ini:0, iniBonus:e.ini});
+      list.push({id:uid(), type:"enemy", tplId:e.id, sceneId:sid,
+        name: n>1 ? e.name+" "+(i+1) : e.name, ini:0, iniBonus:e.ini});
     }
   });
   prep = {sceneId:sid, list:list};
@@ -559,9 +582,9 @@ function startCombat(){
   const s = sceneById(prep.sceneId);
   const order = prep.list.map(c=>{
     if(c.type==="player") return {id:c.id, type:"player", name:c.name, ini:c.ini, conds:[], down:false};
-    const tpl = s.enemies.find(e=>e.id===c.tplId) || {};
-    return {id:c.id, type:"enemy", tplId:c.tplId, name:c.name, ini:c.ini,
-      ac:tpl.ac, hp:tpl.hp, hpMax:tpl.hp,
+    const tpl = tplOf(c.sceneId || prep.sceneId, c.tplId) || {name:c.name, ac:10, hp:1, chakra:null, note:"", thrHp:null, thrTxt:""};
+    return {id:c.id, type:"enemy", tplId:c.tplId, sceneId:c.sceneId, name:c.name, ini:c.ini,
+      ac:num(tpl.ac,10), hp:num(tpl.hp,1), hpMax:num(tpl.hp,1),
       ch:(tpl.chakra==null?null:tpl.chakra), chMax:(tpl.chakra==null?null:tpl.chakra),
       note:tpl.note||"", thrHp:(tpl.thrHp==null?null:tpl.thrHp), thrTxt:tpl.thrTxt||"",
       conds:[], down:false};
@@ -818,16 +841,28 @@ function openAdd(){
         ${esc(e.name)} <span class="tiny">· ${e.hp} HP · AC ${e.ac}${e.reserve?" · Reserve":""}</span>
       </button>`).join("")}`).join("");
   modal(`<h2>Gegner hinzufügen</h2>
-    <p class="muted">Wird mit W20 + Bonus einsortiert.</p>
+    <p class="muted">Wird mit W20 + Bonus einsortiert.${prep?" Die Reihenfolge kannst du danach noch korrigieren.":""}</p>
     ${groups||'<p class="muted">Keine Gegner vorbereitet.</p>'}
     <button class="btn-sm" style="width:100%;margin-top:14px" onclick="closeModal()">Abbrechen</button>`);
 }
 function addMid(sid, eid){
   const e = sceneById(sid).enemies.find(x=>x.id===eid);
+  if(prep){
+    const same = prep.list.filter(c=>c.tplId===eid).length;
+    const ini = d20() + (e.ini||0);
+    const c = {id:uid(), type:"enemy", tplId:eid, sceneId:sid,
+               name: same ? e.name+" "+(same+1) : e.name, ini:ini, iniBonus:e.ini};
+    let at = prep.list.findIndex(x=>x.ini < ini);
+    if(at<0) at = prep.list.length;
+    prep.list.splice(at, 0, c);
+    closeModal(); renderKampf();
+    toast(c.name+" eingefügt mit Initiative "+ini);
+    return;
+  }
   snap("Hinzugefügt: "+e.name);
   const same = S.combat.order.filter(c=>c.tplId===eid).length;
   const ini = d20() + (e.ini||0);
-  const c = {id:uid(), type:"enemy", tplId:eid, name: same? e.name+" "+(same+1) : e.name,
+  const c = {id:uid(), type:"enemy", tplId:eid, sceneId:sid, name: same? e.name+" "+(same+1) : e.name,
     ini:ini, ac:e.ac, hp:e.hp, hpMax:e.hp,
     ch:(e.chakra==null?null:e.chakra), chMax:(e.chakra==null?null:e.chakra),
     note:e.note||"", thrHp:(e.thrHp==null?null:e.thrHp), thrTxt:e.thrTxt||"", conds:[], down:false};

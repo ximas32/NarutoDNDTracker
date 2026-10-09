@@ -28,7 +28,8 @@ Seite einmal geladen ist. Alle Daten liegen im `localStorage` des Browsers.
 - **Undo** für die letzten 40 Aktionen
 - **Gefallene Gegner** werden ausgegraut ans Ende sortiert, nicht gelöscht,
   und lassen sich mit halben HP zurückholen
-- **Gegner mitten im Kampf hinzufügen**, wird automatisch einsortiert
+- **Gegner hinzufügen**, vor dem Kampf und mitten im Kampf, auch aus anderen
+  Szenen — wird mit W20 + Bonus automatisch einsortiert
 - **JSON-Export und -Import** für Szenen und Spieler
 - Dunkles Design, Wake Lock gegen den Bildschirmschoner
 
@@ -45,7 +46,7 @@ Seite einmal geladen ist. Alle Daten liegen im `localStorage` des Browsers.
 ## Vorbereitete Daten
 
 Die Szenen „Hinterhalt an der Brücke", „Endkampf — Phase 1", „Endkampf —
-Phase 2" und „Weitere Gegner" sind fest eingebaut und werden beim ersten Start
+Phase 2" (mit Kazen) und „Weitere Gegner" sind fest eingebaut und werden beim ersten Start
 automatisch angelegt. Über *Vorlagen laden* lassen sie sich jederzeit
 wiederherstellen.
 
