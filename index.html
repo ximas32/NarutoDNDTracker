@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Kampf-Tracker</title>
+<style>
+:root{
+  --bg:#12141a; --bg2:#1a1d26; --bg3:#232733; --line:#333949;
+  --tx:#e6e8ef; --tx2:#99a0b3; --tx3:#6b7288;
+  --acc:#e8903a; --acc2:#ffb663;
+  --dmg:#d9534f; --heal:#4f9d69; --chak:#4a8fd4;
+  --warn:#e0b429; --down:#4a4f5e;
+  --r:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--tx);
+  font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:env(safe-area-inset-bottom);
+  overscroll-behavior-y:contain;
+}
+button{font:inherit;color:inherit;background:var(--bg3);border:1px solid var(--line);
+  border-radius:var(--r);padding:12px 14px;cursor:pointer;min-height:46px}
+button:active{filter:brightness(1.35)}
+button:disabled{opacity:.35;cursor:default}
+input,select,textarea{font:inherit;color:var(--tx);background:var(--bg3);
+  border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;min-height:44px}
+input[type=checkbox]{width:24px;height:24px;min-height:0;accent-color:var(--acc)}
+h1,h2,h3{margin:0 0 10px}
+h1{font-size:20px}
+h2{font-size:17px}
+h3{font-size:15px;color:var(--tx2);font-weight:600}
+.wrap{max-width:860px;margin:0 auto;padding:10px 10px 90px}
+.hide{display:none !important}
+.muted{color:var(--tx2);font-size:13px}
+.tiny{font-size:12px;color:var(--tx2)}
+.row{display:flex;gap:8px;align-items:center}
+.row.wrap-r{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px;margin-bottom:10px}
+.btn-acc{background:var(--acc);color:#1a1205;border-color:var(--acc);font-weight:700}
+.btn-dmg{background:#3a1f1f;border-color:#5c2d2d}
+.btn-heal{background:#1d3327;border-color:#2d5240}
+.btn-chak{background:#1c2b3d;border-color:#2c4766}
+.btn-sm{min-height:38px;padding:7px 11px;font-size:14px}
+.btn-x{min-height:34px;padding:5px 9px;font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+label.f{display:block;margin-bottom:8px}
+label.f span{display:block;font-size:12px;color:var(--tx2);margin-bottom:3px}
+
+/* ---- Tabs ---- */
+.tabs{position:sticky;top:0;z-index:40;display:flex;gap:6px;
+  background:var(--bg);padding:8px 10px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border-radius:var(--r);background:var(--bg2);font-weight:600}
+.tabs button.on{background:var(--acc);color:#1a1205;border-color:var(--acc)}
+
+/* ---- Kampfzeile ---- */
+.cmb{border:1px solid var(--line);border-radius:var(--r);background:var(--bg2);
+  padding:10px;margin-bottom:8px;position:relative;overflow:hidden}
+.cmb.act{border-color:var(--acc);border-width:2px;background:#2a1f10;
+  box-shadow:0 0 0 2px rgba(232,144,58,.25)}
+.cmb.act .nm{font-size:26px;color:var(--acc2)}
+.cmb.pl{background:#171f24}
+.cmb.pl.act{background:#2a1f10}
+.cmb.dn{opacity:.45;background:var(--bg)}
+.cmb.thr{border-color:var(--warn);background:#2b2410}
+.cmb.act.thr{border-color:var(--warn);background:#33290f}
+.nm{font-size:18px;font-weight:700;line-height:1.15}
+.nt{font-size:12px;color:var(--tx2);margin-top:2px}
+.thrmsg{font-size:13px;color:#ffd87a;font-weight:600;margin-top:4px}
+.ini{background:var(--bg3);border:1px solid var(--line);border-radius:8px;
+  min-width:44px;text-align:center;padding:5px 7px;font-weight:700;font-size:17px}
+.cmb.act .ini{background:var(--acc);color:#1a1205;border-color:var(--acc)}
+.bar{height:11px;background:#2a2e3a;border-radius:6px;overflow:hidden;margin-top:6px}
+.bar>i{display:block;height:100%;background:var(--heal);transition:width .18s}
+.bar>i.mid{background:var(--warn)}
+.bar>i.low{background:var(--dmg)}
+.stats{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-top:5px;font-size:14px}
+.stats b{font-size:18px}
+.pill{display:inline-block;background:var(--bg3);border:1px solid var(--line);
+  border-radius:999px;padding:2px 9px;font-size:12px}
+.cond{display:inline-flex;gap:5px;align-items:center;background:#3a2448;
+  border:1px solid #58376e;border-radius:999px;padding:3px 9px;font-size:12px;margin:4px 4px 0 0}
+.cond.c-vergiftet{background:#1f3a22;border-color:#36613c}
+.cond.c-chakra-starre{background:#1c2b3d;border-color:#2c4766}
+.cond.c-liegend{background:#3a2e1c;border-color:#61502c}
+.cond.c-festgesetzt{background:#3a1f1f;border-color:#5c2d2d}
+.cond b{font-variant-numeric:tabular-nums}
+
+/* ---- Initiative-Sortierung ---- */
+.sortrow{display:flex;gap:8px;align-items:center;background:var(--bg2);
+  border:1px solid var(--line);border-radius:var(--r);padding:8px;margin-bottom:6px}
+.sortrow.drag{opacity:.55;border-color:var(--acc)}
+.handle{touch-action:none;cursor:grab;padding:10px 12px;background:var(--bg3);
+  border:1px solid var(--line);border-radius:8px;user-select:none;font-size:17px}
+
+/* ---- Leiste unten ---- */
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--bg2);
+  border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  display:flex;gap:8px;align-items:center}
+.bottom .next{flex:1;font-size:19px;font-weight:800;min-height:56px;
+  background:var(--acc);color:#1a1205;border-color:var(--acc)}
+.rnd{text-align:center;min-width:62px;line-height:1.1}
+.rnd b{display:block;font-size:24px}
+
+/* ---- Modal ---- */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.72);
+  display:flex;align-items:flex-end;justify-content:center;padding:0}
+.sheet{background:var(--bg2);border:1px solid var(--line);border-radius:14px 14px 0 0;
+  width:100%;max-width:520px;padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow:auto}
+@media(min-width:560px){.ov{align-items:center;padding:16px}
+  .sheet{border-radius:14px;padding-bottom:14px}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:56px;font-size:22px;font-weight:700}
+.disp{background:var(--bg3);border:2px solid var(--line);border-radius:10px;
+  text-align:center;font-size:34px;font-weight:800;padding:8px;margin-bottom:10px;
+  font-variant-numeric:tabular-nums;min-height:60px}
+
+/* ---- Toast ---- */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:96px;z-index:200;pointer-events:none;
+  background:#2d3444;border:1px solid var(--acc);color:var(--tx);
+  padding:11px 16px;border-radius:10px;max-width:92%;box-shadow:0 6px 24px rgba(0,0,0,.5);
+  font-size:14px;text-align:center}
+</style>
+</head>
+<body>
+<div class="tabs">
+  <button id="tabKampf" class="on" onclick="go('kampf')">Kampf</button>
+  <button id="tabSzenen" onclick="go('szenen')">Szenen</button>
+  <button id="tabSpieler" onclick="go('spieler')">Spieler</button>
+</div>
+
+<!-- ============ KAMPF ============ -->
+<div id="vKampf" class="wrap">
+  <div id="kNoScene" class="card">
+    <h2>Kein Kampf aktiv</h2>
+    <p class="muted">Wähle eine Szene aus, um die Initiative zu würfeln und den Kampf zu starten.</p>
+    <button class="btn-acc" style="width:100%" onclick="go('szenen')">Zu den Szenen</button>
+  </div>
+
+  <!-- Initiative-Phase -->
+  <div id="kInit" class="hide">
+    <div class="card">
+      <h2 id="kInitTitle">Initiative</h2>
+      <p class="muted">Werte prüfen, Reihenfolge per Griff oder Pfeilen korrigieren, dann starten.</p>
+      <div class="grid2">
+        <button class="btn-sm" onclick="rollInit()">W20 für Gegner würfeln</button>
+        <button class="btn-sm" onclick="sortInit()">Nach Wert sortieren</button>
+      </div>
+    </div>
+    <div id="kInitList"></div>
+    <button class="btn-acc" style="width:100%;min-height:54px;font-size:18px" onclick="startCombat()">Kampf starten</button>
+    <button class="btn-sm" style="width:100%;margin-top:8px" onclick="abortPrep()">Abbrechen</button>
+  </div>
+
+  <!-- Kampf-Phase -->
+  <div id="kFight" class="hide">
+    <div id="kList"></div>
+    <div class="card">
+      <div class="grid2">
+        <button class="btn-sm" onclick="openAdd()">Gegner hinzufügen</button>
+        <button class="btn-sm" onclick="resetCombat()">Kampf zurücksetzen</button>
+      </div>
+      <button class="btn-sm" style="width:100%;margin-top:8px" onclick="endCombat()">Kampf beenden</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SZENEN ============ -->
+<div id="vSzenen" class="wrap hide">
+  <div class="card">
+    <h2>Szenen</h2>
+    <div class="grid2">
+      <button class="btn-sm" onclick="newScene()">Neue Szene</button>
+      <button class="btn-sm" onclick="loadPreset()">Vorlagen laden</button>
+    </div>
+    <div class="grid2" style="margin-top:8px">
+      <button class="btn-sm" onclick="exportJson()">Export JSON</button>
+      <button class="btn-sm" onclick="importJson()">Import JSON</button>
+    </div>
+    <input id="fileIn" type="file" accept="application/json,.json" class="hide">
+  </div>
+  <div id="sList"></div>
+</div>
+
+<!-- ============ SPIELER ============ -->
+<div id="vSpieler" class="wrap hide">
+  <div class="card">
+    <h2>Spieler</h2>
+    <p class="muted">Bleiben über alle Szenen gespeichert. HP und Chakra werden nicht getrackt.</p>
+    <div class="row" style="margin-top:8px">
+      <input id="pName" class="grow" placeholder="Name" autocomplete="off">
+      <input id="pInit" style="width:92px" placeholder="Init" inputmode="numeric">
+      <button class="btn-acc" onclick="addPlayer()">+</button>
+    </div>
+  </div>
+  <div id="pList"></div>
+</div>
+
+<!-- Leiste unten (nur im Kampf) -->
+<div id="bottom" class="bottom hide">
+  <button class="btn-sm" style="min-height:56px" onclick="undo()" id="btnUndo" title="Rückgängig">↶</button>
+  <div class="rnd"><span class="tiny">Runde</span><b id="roundNo">1</b></div>
+  <button class="next" onclick="nextTurn()">Nächster ▸</button>
+</div>
+
+<div id="modals"></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ======================= Daten & Zustand ======================= */
+const KEY = "narutodnd.kampftracker.v1";
+const CONDS = ["vergiftet","Chakra-Starre","liegend","festgesetzt"];
+
+const PRESETS = [
+ {name:"Hinterhalt an der Brücke", enemies:[
+   {name:"Söldner",count:6,ac:13,hp:22,chakra:null,ini:1,note:"Angriff +4, 1W8+2. Ergibt sich bei halben Verlusten",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Söldner-Hauptmann",count:1,ac:15,hp:55,chakra:null,ini:3,note:"Angriff +6, 1W10+3. Erdstoss 1×: STR-SG 13, 1W8 + liegend",thrHp:27,thrTxt:"Kampfrausch: +2 Angriff und zweiter Nahkampfangriff pro Runde",reserve:false}
+ ]},
+ {name:"Endkampf — Phase 1", enemies:[
+   {name:"Marionette Yanis",count:1,ac:15,hp:60,chakra:null,ini:5,note:"2 Angriffe +7, je 1W8+4. Genjutsu ohne Save. Bewegung 15 m. Holt zu Zugbeginn eine gefallene kleine Puppe mit 6 HP zurück",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Kleine Puppe",count:4,ac:13,hp:12,chakra:null,ini:2,note:"Angriff +5, 1W6+2. Immun gegen Gift und Genjutsu",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Kazen",count:1,ac:16,hp:90,chakra:40,ini:3,note:"Phase 1: greift nicht an, ist unerreichbar. Angriff +7, SG 14",thrHp:null,thrTxt:"",reserve:false}
+ ]},
+ {name:"Endkampf — Phase 2", enemies:[
+   {name:"Feuerspucker-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Kegel 4,5 m, DEX-SG 13, 2W6 Feuer",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Windstoss-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Linie 12 m, STR-SG 13, 1W8 + 3 m zurück + liegend",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Gift-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, CON-SG 13 → vergiftet",thrHp:null,thrTxt:"",reserve:false},
+   {name:"Blitz-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, Ziel verliert Reaktion",thrHp:null,thrTxt:"",reserve:true},
+   {name:"Erd-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W8+3",thrHp:null,thrTxt:"",reserve:true},
+   {name:"Wasser-Puppe",count:1,ac:14,hp:25,chakra:null,ini:2,note:"Angriff +6, 1W6+2, Ziel 3 m ziehen",thrHp:null,thrTxt:"",reserve:true}
+ ]},
+ {name:"Weitere Gegner", enemies:[
+   {name:"Suna-Patrouillen-Ninja",count:1,ac:15,hp:34,chakra:null,ini:3,note:"Angriff +5, 1W8+2. Nimmt gefangen statt zu töten",thrHp:null,thrTxt:"",reserve:false}
+ ]}
+];
+
+let S = {players:[], scenes:[], combat:null};
+let prep = null;          // Initiative-Vorbereitung
+let undoStack = [];
+let wakeLock = null;
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Speichern fehlgeschlagen"); } }
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const d = JSON.parse(raw); S = Object.assign({players:[],scenes:[],combat:null}, d); }
+  }catch(e){ toast("Gespeicherte Daten unlesbar — starte leer"); }
+  if(!S.scenes.length) seedPresets();
+}
+function seedPresets(){
+  PRESETS.forEach(p=>{
+    S.scenes.push({id:uid(), name:p.name, enemies:p.enemies.map(e=>Object.assign({id:uid()},e))});
+  });
+  save();
+}
+function loadPreset(){
+  const miss = PRESETS.filter(p=>!S.scenes.some(s=>s.name===p.name));
+  if(!miss.length){ toast("Alle Vorlagen sind bereits vorhanden"); return; }
+  miss.forEach(p=>S.scenes.push({id:uid(),name:p.name,enemies:p.enemies.map(e=>Object.assign({id:uid()},e))}));
+  save(); renderScenes(); toast(miss.length+" Vorlage(n) hinzugefügt");
+}
+
+/* ======================= Helfer ======================= */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function num(v, def){ const n = parseInt(String(v).replace(/[^0-9+-]/g,""),10); return isNaN(n)?def:n; }
+function d20(){ return 1 + Math.floor(Math.random()*20); }
+let toastT = null;
+function toast(msg, ms){
+  const t = document.getElementById("toast");
+  t.innerHTML = '<div class="toast">'+esc(msg)+'</div>';
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>{ t.innerHTML=""; }, ms||2600);
+}
+function go(v){
+  ["kampf","szenen","spieler"].forEach(n=>{
+    const cap = n[0].toUpperCase()+n.slice(1);
+    document.getElementById("v"+cap).classList.toggle("hide", n!==v);
+    document.getElementById("tab"+cap).classList.toggle("on", n===v);
+  });
+  if(v==="szenen") renderScenes();
+  if(v==="spieler") renderPlayers();
+  if(v==="kampf") renderKampf();
+  window.scrollTo(0,0);
+}
+
+/* ======================= Undo ======================= */
+function snap(label){
+  if(!S.combat) return;
+  undoStack.push({label:label, data:JSON.stringify(S.combat)});
+  if(undoStack.length>40) undoStack.shift();
+  const b = document.getElementById("btnUndo"); if(b) b.disabled = false;
+}
+function undo(){
+  const u = undoStack.pop();
+  if(!u){ toast("Nichts zum Rückgängigmachen"); return; }
+  S.combat = JSON.parse(u.data);
+  save(); renderKampf();
+  toast("Rückgängig: "+u.label);
+  if(!undoStack.length){ const b=document.getElementById("btnUndo"); if(b) b.disabled = true; }
+}
+
+/* ======================= Spieler ======================= */
+function addPlayer(){
+  const n = document.getElementById("pName").value.trim();
+  if(!n){ toast("Name fehlt"); return; }
+  S.players.push({id:uid(), name:n, ini:num(document.getElementById("pInit").value,10), on:true});
+  document.getElementById("pName").value=""; document.getElementById("pInit").value="";
+  save(); renderPlayers();
+}
+function renderPlayers(){
+  const el = document.getElementById("pList");
+  if(!S.players.length){ el.innerHTML = '<p class="muted">Noch keine Spieler angelegt.</p>'; return; }
+  el.innerHTML = S.players.map((p,i)=>`
+    <div class="card"><div class="row wrap-r">
+      <input class="grow" value="${esc(p.name)}" onchange="setPl(${i},'name',this.value)">
+      <input style="width:84px" inputmode="numeric" value="${p.ini}" onchange="setPl(${i},'ini',this.value)">
+      <label class="row" style="gap:5px"><input type="checkbox" ${p.on?"checked":""} onchange="setPl(${i},'on',this.checked)"><span class="tiny">aktiv</span></label>
+      <button class="btn-x" onclick="delPl(${i})">✕</button>
+    </div></div>`).join("");
+}
+function setPl(i,k,v){ S.players[i][k] = (k==="ini")?num(v,10):(k==="on"?!!v:v); save(); }
+function delPl(i){ if(!confirm("Spieler „"+S.players[i].name+"“ löschen?")) return; S.players.splice(i,1); save(); renderPlayers(); }
+
+/* ======================= Szenen ======================= */
+function newScene(){
+  const n = prompt("Name der Szene:", "Neue Szene");
+  if(n===null) return;
+  S.scenes.push({id:uid(), name:(n.trim()||"Neue Szene"), enemies:[]});
+  save(); renderScenes();
+}
+function sceneById(id){ return S.scenes.find(s=>s.id===id); }
+function delScene(id){
+  const s = sceneById(id);
+  if(!confirm("Szene „"+s.name+"“ mit allen Gegnern löschen?")) return;
+  S.scenes = S.scenes.filter(x=>x.id!==id); save(); renderScenes();
+}
+function renameScene(id){
+  const s = sceneById(id); const n = prompt("Name der Szene:", s.name);
+  if(n===null) return; s.name = n.trim()||s.name; save(); renderScenes();
+}
+function dupScene(id){
+  const s = sceneById(id);
+  S.scenes.push({id:uid(), name:s.name+" (Kopie)", enemies:s.enemies.map(e=>Object.assign({},e,{id:uid()}))});
+  save(); renderScenes();
+}
+function addEnemy(id){
+  sceneById(id).enemies.push({id:uid(),name:"Neuer Gegner",count:1,ac:12,hp:10,chakra:null,ini:0,note:"",thrHp:null,thrTxt:"",reserve:false});
+  save(); renderScenes(id);
+}
+function delEnemy(sid, eid){
+  const s = sceneById(sid); s.enemies = s.enemies.filter(e=>e.id!==eid); save(); renderScenes(sid);
+}
+function setEn(sid,eid,k,v){
+  const e = sceneById(sid).enemies.find(x=>x.id===eid);
+  if(k==="name"||k==="note"||k==="thrTxt") e[k]=v;
+  else if(k==="reserve") e[k]=!!v;
+  else if(k==="chakra"||k==="thrHp") e[k] = (String(v).trim()==="")?null:num(v,null);
+  else e[k]=num(v,0);
+  if(k==="count") e.count = Math.max(1, Math.min(30, e.count));
+  save();
+}
+let openScenes = {};
+function renderScenes(focus){
+  if(focus) openScenes[focus]=true;
+  const el = document.getElementById("sList");
+  if(!S.scenes.length){ el.innerHTML='<p class="muted">Keine Szenen vorhanden.</p>'; return; }
+  el.innerHTML = S.scenes.map(s=>{
+    const open = !!openScenes[s.id];
+    const cnt = s.enemies.reduce((a,e)=>a+(e.count||1),0);
+    return `<div class="card">
+      <div class="row wrap-r">
+        <div class="grow" onclick="toggleScene('${s.id}')" style="cursor:pointer">
+          <div class="nm">${esc(s.name)}</div>
+          <div class="tiny">${s.enemies.length} Typ(en) · ${cnt} Gegner</div>
+        </div>
+        <button class="btn-acc btn-sm" onclick="prepCombat('${s.id}')">Starten</button>
+        <button class="btn-x" onclick="toggleScene('${s.id}')">${open?"▴":"▾"}</button>
+      </div>
+      ${open?`<div style="margin-top:10px">
+        <div class="row wrap-r" style="margin-bottom:8px">
+          <button class="btn-x" onclick="renameScene('${s.id}')">Umbenennen</button>
+          <button class="btn-x" onclick="dupScene('${s.id}')">Duplizieren</button>
+          <button class="btn-x" onclick="exportScene('${s.id}')">Export</button>
+          <button class="btn-x" onclick="delScene('${s.id}')">Löschen</button>
+        </div>
+        ${s.enemies.map(e=>enemyForm(s.id,e)).join("")}
+        <button class="btn-sm" style="width:100%" onclick="addEnemy('${s.id}')">+ Gegner</button>
+      </div>`:""}
+    </div>`;
+  }).join("");
+}
+function toggleScene(id){ openScenes[id] = !openScenes[id]; renderScenes(); }
+function enemyForm(sid,e){
+  const S_ = (k,v)=>`onchange="setEn('${sid}','${e.id}','${k}',this.value)"`;
+  return `<div class="card" style="background:var(--bg3)">
+    <div class="row" style="margin-bottom:8px">
+      <input class="grow" value="${esc(e.name)}" ${S_("name")} placeholder="Name">
+      <button class="btn-x" onclick="delEnemy('${sid}','${e.id}')">✕</button>
+    </div>
+    <div class="grid3">
+      <label class="f"><span>AC</span><input inputmode="numeric" value="${e.ac}" ${S_("ac")}></label>
+      <label class="f"><span>HP max</span><input inputmode="numeric" value="${e.hp}" ${S_("hp")}></label>
+      <label class="f"><span>Chakra</span><input inputmode="numeric" value="${e.chakra==null?"":e.chakra}" ${S_("chakra")} placeholder="—"></label>
+      <label class="f"><span>Init-Bonus</span><input inputmode="numeric" value="${e.ini>=0?"+"+e.ini:e.ini}" ${S_("ini")}></label>
+      <label class="f"><span>Anzahl</span><input inputmode="numeric" value="${e.count}" ${S_("count")}></label>
+      <label class="f"><span>Reserve</span><br><input type="checkbox" ${e.reserve?"checked":""} onchange="setEn('${sid}','${e.id}','reserve',this.checked)"></label>
+    </div>
+    <label class="f"><span>Notiz (Angriffswerte o. ä.)</span><input value="${esc(e.note)}" ${S_("note")}></label>
+    <div class="grid2">
+      <label class="f"><span>Schwelle bei HP</span><input inputmode="numeric" value="${e.thrHp==null?"":e.thrHp}" ${S_("thrHp")} placeholder="—"></label>
+      <label class="f"><span>Hinweistext</span><input value="${esc(e.thrTxt)}" ${S_("thrTxt")} placeholder="z. B. Kampfrausch"></label>
+    </div>
+  </div>`;
+}
+
+/* ======================= Export / Import ======================= */
+function dl(obj, name){
+  const blob = new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function exportJson(){ dl({v:1, players:S.players, scenes:S.scenes}, "kampf-tracker-"+new Date().toISOString().slice(0,10)+".json"); }
+function exportScene(id){ const s=sceneById(id); dl({v:1, scenes:[s]}, "szene-"+s.name.replace(/[^\wäöüÄÖÜß -]/g,"")+".json"); }
+function importJson(){
+  const f = document.getElementById("fileIn");
+  f.value=""; f.onchange = ()=>{
+    const file = f.files[0]; if(!file) return;
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const d = JSON.parse(r.result);
+        const sc = Array.isArray(d.scenes)?d.scenes:[];
+        const pl = Array.isArray(d.players)?d.players:[];
+        if(!sc.length && !pl.length){ toast("Datei enthält keine Szenen oder Spieler"); return; }
+        if(!confirm("Import: "+sc.length+" Szene(n), "+pl.length+" Spieler.\nAn vorhandene Daten anhängen?")) return;
+        sc.forEach(s=>S.scenes.push({id:uid(), name:String(s.name||"Import"), enemies:(s.enemies||[]).map(e=>({
+          id:uid(), name:String(e.name||"?"), count:num(e.count,1), ac:num(e.ac,10), hp:num(e.hp,1),
+          chakra:(e.chakra==null?null:num(e.chakra,null)), ini:num(e.ini,0), note:String(e.note||""),
+          thrHp:(e.thrHp==null?null:num(e.thrHp,null)), thrTxt:String(e.thrTxt||""), reserve:!!e.reserve
+        }))}));
+        pl.forEach(p=>S.players.push({id:uid(), name:String(p.name||"?"), ini:num(p.ini,10), on:p.on!==false}));
+        save(); renderScenes(); toast("Import erfolgreich");
+      }catch(err){ toast("Datei ist kein gültiges JSON"); }
+    };
+    r.readAsText(file);
+  };
+  f.click();
+}
+
+/* ======================= Initiative-Vorbereitung ======================= */
+function prepCombat(sid){
+  const s = sceneById(sid);
+  const act = S.players.filter(p=>p.on);
+  if(!s.enemies.length && !act.length){ toast("Szene hat weder Gegner noch aktive Spieler"); return; }
+  if(S.combat && !confirm("Ein Kampf läuft bereits. Verwerfen und neuen vorbereiten?")) return;
+  const list = [];
+  act.forEach(p=>list.push({id:uid(), type:"player", refId:p.id, name:p.name, ini:p.ini}));
+  s.enemies.filter(e=>!e.reserve).forEach(e=>{
+    const n = Math.max(1, e.count||1);
+    for(let i=0;i<n;i++){
+      list.push({id:uid(), type:"enemy", tplId:e.id, name: n>1 ? e.name+" "+(i+1) : e.name,
+        ini:0, iniBonus:e.ini});
+    }
+  });
+  prep = {sceneId:sid, list:list};
+  rollInit(true);
+  go("kampf");
+}
+function abortPrep(){ prep=null; renderKampf(); }
+function rollInit(silent){
+  if(!prep) return;
+  const byTpl = {};
+  prep.list.forEach(c=>{
+    if(c.type!=="enemy") return;
+    if(byTpl[c.tplId]===undefined) byTpl[c.tplId] = d20() + (c.iniBonus||0);
+    c.ini = byTpl[c.tplId];
+  });
+  sortInit(true);
+  if(!silent) toast("Initiative für Gegner gewürfelt");
+}
+function sortInit(silent){
+  if(!prep) return;
+  prep.list.sort((a,b)=> b.ini - a.ini || (a.type===b.type?0:(a.type==="player"?-1:1)));
+  renderKampf();
+  if(!silent) toast("Nach Wert sortiert");
+}
+function setPrepIni(id,v){
+  const c = prep.list.find(x=>x.id===id); if(c) c.ini = num(v,0);
+}
+function movePrep(id,dir){
+  const i = prep.list.findIndex(x=>x.id===id); const j = i+dir;
+  if(i<0||j<0||j>=prep.list.length) return;
+  const t = prep.list[i]; prep.list[i]=prep.list[j]; prep.list[j]=t;
+  renderKampf();
+}
+function renderPrep(){
+  document.getElementById("kInitTitle").textContent = "Initiative — " + sceneById(prep.sceneId).name;
+  document.getElementById("kInitList").innerHTML = prep.list.map((c,i)=>`
+    <div class="sortrow" data-id="${c.id}">
+      <div class="handle" onpointerdown="dragStart(event,'${c.id}')">⠿</div>
+      <input style="width:74px;text-align:center;font-weight:700" inputmode="numeric"
+             value="${c.ini}" onchange="setPrepIni('${c.id}',this.value)">
+      <div class="grow">
+        <div style="font-weight:600">${esc(c.name)}</div>
+        <div class="tiny">${c.type==="player"?"Spieler":"Gegner"}</div>
+      </div>
+      <button class="btn-x" ${i===0?"disabled":""} onclick="movePrep('${c.id}',-1)">▲</button>
+      <button class="btn-x" ${i===prep.list.length-1?"disabled":""} onclick="movePrep('${c.id}',1)">▼</button>
+    </div>`).join("");
+}
+
+/* ---- Drag & Drop über Pointer-Events (funktioniert auch auf dem Handy) ---- */
+let dragId = null, dragEl = null;
+function dragStart(ev, id){
+  ev.preventDefault();
+  dragId = id;
+  dragEl = document.querySelector('.sortrow[data-id="'+id+'"]');
+  if(!dragEl) return;
+  dragEl.classList.add("drag");
+  ev.target.setPointerCapture(ev.pointerId);
+  ev.target.onpointermove = dragMove;
+  ev.target.onpointerup = ev.target.onpointercancel = dragEnd;
+}
+function dragMove(ev){
+  if(!dragEl) return;
+  dragEl.style.pointerEvents = "none";
+  const under = document.elementFromPoint(ev.clientX, ev.clientY);
+  dragEl.style.pointerEvents = "";
+  const row = under && under.closest ? under.closest(".sortrow") : null;
+  if(!row || row===dragEl) return;
+  const r = row.getBoundingClientRect();
+  const after = ev.clientY > r.top + r.height/2;
+  row.parentNode.insertBefore(dragEl, after ? row.nextSibling : row);
+}
+function dragEnd(ev){
+  if(ev && ev.target){ ev.target.onpointermove = ev.target.onpointerup = ev.target.onpointercancel = null; }
+  if(!dragEl){ dragId=null; return; }
+  dragEl.classList.remove("drag");
+  const order = Array.from(document.querySelectorAll(".sortrow")).map(n=>n.dataset.id);
+  prep.list.sort((a,b)=> order.indexOf(a.id) - order.indexOf(b.id));
+  dragEl = null; dragId = null;
+  renderKampf();
+}
+
+/* ======================= Kampf starten ======================= */
+function startCombat(){
+  if(!prep) return;
+  const s = sceneById(prep.sceneId);
+  const order = prep.list.map(c=>{
+    if(c.type==="player") return {id:c.id, type:"player", name:c.name, ini:c.ini, conds:[], down:false};
+    const tpl = s.enemies.find(e=>e.id===c.tplId) || {};
+    return {id:c.id, type:"enemy", tplId:c.tplId, name:c.name, ini:c.ini,
+      ac:tpl.ac, hp:tpl.hp, hpMax:tpl.hp,
+      ch:(tpl.chakra==null?null:tpl.chakra), chMax:(tpl.chakra==null?null:tpl.chakra),
+      note:tpl.note||"", thrHp:(tpl.thrHp==null?null:tpl.thrHp), thrTxt:tpl.thrTxt||"",
+      conds:[], down:false};
+  });
+  S.combat = {sceneId:prep.sceneId, round:1, curId:(order[0]?order[0].id:null), order:order,
+              start:JSON.stringify(order)};
+  prep = null; undoStack = [];
+  save(); renderKampf(); requestWake();
+  toast("Kampf gestartet — Runde 1");
+}
+function endCombat(){
+  if(!confirm("Kampf beenden? Die Szenen-Vorbereitung bleibt erhalten.")) return;
+  S.combat = null; undoStack = []; save(); releaseWake(); renderKampf();
+}
+function resetCombat(){
+  if(!S.combat) return;
+  if(!confirm("Alle HP, Chakra, Zustände und den Rundenzähler zurücksetzen?")) return;
+  snap("Kampf zurücksetzen");
+  S.combat.order = JSON.parse(S.combat.start);
+  S.combat.round = 1;
+  S.combat.curId = S.combat.order.length ? S.combat.order[0].id : null;
+  save(); renderKampf(); toast("Kampf zurückgesetzt");
+}
+
+/* ======================= Kampfansicht ======================= */
+function renderKampf(){
+  const noScene = document.getElementById("kNoScene");
+  const vInit = document.getElementById("kInit");
+  const vFight = document.getElementById("kFight");
+  const bottom = document.getElementById("bottom");
+  noScene.classList.toggle("hide", !!prep || !!S.combat);
+  vInit.classList.toggle("hide", !prep);
+  vFight.classList.toggle("hide", !S.combat);
+  bottom.classList.toggle("hide", !S.combat);
+  if(prep){ renderPrep(); return; }
+  if(!S.combat) return;
+  document.getElementById("roundNo").textContent = S.combat.round;
+  document.getElementById("btnUndo").disabled = !undoStack.length;
+  const alive = S.combat.order.filter(c=>!c.down);
+  const down  = S.combat.order.filter(c=>c.down);
+  document.getElementById("kList").innerHTML =
+    alive.map(cmbHtml).join("") +
+    (down.length?'<h3 style="margin:14px 0 6px">Gefallen</h3>':"") +
+    down.map(cmbHtml).join("");
+}
+function hpCls(f){ return f<=0.25?"low":(f<=0.5?"mid":""); }
+function cmbHtml(c){
+  const act = c.id===S.combat.curId && !c.down;
+  const thr = c.type==="enemy" && c.thrHp!=null && c.hp<=c.thrHp && !c.down;
+  const cls = ["cmb", c.type==="player"?"pl":"", act?"act":"", c.down?"dn":"", thr?"thr":""].join(" ");
+  let body;
+  if(c.type==="player"){
+    body = `<div class="tiny">Spieler</div>`;
+  }else{
+    const f = c.hpMax>0 ? Math.max(0,c.hp)/c.hpMax : 0;
+    body = `
+      <div class="stats">
+        <span><b>${c.hp}</b> / ${c.hpMax} HP</span>
+        <span class="pill">AC ${c.ac}</span>
+        ${c.chMax!=null?`<span class="pill" style="color:#8ec2f5">Chakra ${c.ch} / ${c.chMax}</span>`:""}
+      </div>
+      <div class="bar"><i class="${hpCls(f)}" style="width:${Math.round(f*100)}%"></i></div>`;
+  }
+  return `<div class="${cls}">
+    <div class="row" style="align-items:flex-start">
+      <div class="ini">${c.ini}</div>
+      <div class="grow" ${c.type==="enemy"&&!c.down?`onclick="openPad('${c.id}','dmg')" style="cursor:pointer"`:""}>
+        <div class="nm">${esc(c.name)}</div>
+        ${c.type==="enemy"&&c.note?`<div class="nt">${esc(c.note)}</div>`:""}
+        ${thr&&c.thrTxt?`<div class="thrmsg">⚠ ${esc(c.thrTxt)}</div>`:""}
+      </div>
+    </div>
+    ${body}
+    <div>${c.conds.map((k,i)=>condHtml(c.id,k,i)).join("")}</div>
+    <div class="row wrap-r" style="margin-top:8px">
+      ${c.type==="enemy" && !c.down ? `<button class="btn-x btn-dmg" onclick="openPad('${c.id}','dmg')">Schaden</button>
+        <button class="btn-x btn-heal" onclick="openPad('${c.id}','heal')">Heilung</button>
+        ${c.chMax!=null?`<button class="btn-x btn-chak" onclick="openPad('${c.id}','chak')">Chakra</button>`:""}`:""}
+      ${c.down ? `<button class="btn-x" onclick="revive('${c.id}')">↑ zurückholen (halbe HP)</button>
+        <button class="btn-x" onclick="removeCmb('${c.id}')">entfernen</button>`:""}
+      <button class="btn-x" onclick="openConds('${c.id}')">Zustände</button>
+      ${!c.down && c.type==="enemy" ? `<button class="btn-x" onclick="setTurn('${c.id}')">am Zug</button>`:""}
+      ${!c.down && c.type==="player" ? `<button class="btn-x" onclick="setTurn('${c.id}')">am Zug</button>`:""}
+    </div>
+  </div>`;
+}
+function condHtml(cid,k,i){
+  const slug = k.name.toLowerCase().replace(/[^a-zäöü]+/g,"-");
+  return `<span class="cond c-${slug}" onclick="delCond('${cid}',${i})">${esc(k.name)}${k.r!=null?` <b>${k.r}</b>`:""} ✕</span>`;
+}
+
+/* ======================= Zug & Runde ======================= */
+function setTurn(id){ snap("Zug gesetzt"); S.combat.curId = id; save(); renderKampf(); }
+function nextTurn(){
+  const o = S.combat.order;
+  const alive = o.filter(c=>!c.down);
+  if(!alive.length){ toast("Niemand mehr im Kampf"); return; }
+  snap("Nächster Zug");
+  let i = o.findIndex(c=>c.id===S.combat.curId);
+  let wrapped = false;
+  for(let n=0;n<o.length+1;n++){
+    i++;
+    if(i>=o.length){ i=0; wrapped=true; }
+    if(!o[i].down) break;
+  }
+  S.combat.curId = o[i].id;
+  if(wrapped){ S.combat.round++; tickConds(); }
+  save(); renderKampf();
+  const el = document.querySelector(".cmb.act");
+  if(el) el.scrollIntoView({block:"center", behavior:"smooth"});
+}
+function tickConds(){
+  const expired = [];
+  S.combat.order.forEach(c=>{
+    c.conds = c.conds.filter(k=>{
+      if(k.r==null) return true;
+      k.r--;
+      if(k.r<=0){ expired.push(c.name+": "+k.name); return false; }
+      return true;
+    });
+  });
+  if(expired.length) toast("Abgelaufen — "+expired.join(" · "), 5000);
+  else toast("Runde "+S.combat.round, 1500);
+}
+
+/* ======================= Zustände ======================= */
+function openConds(cid){
+  const c = S.combat.order.find(x=>x.id===cid);
+  modal(`<h2>${esc(c.name)}</h2>
+    <h3>Zustand setzen</h3>
+    <div class="grid2">${CONDS.map(n=>`<button class="btn-sm" onclick="addCond('${cid}','${n}')">${n}</button>`).join("")}</div>
+    <h3 style="margin-top:12px">Eigener Effekt</h3>
+    <div class="row"><input id="cdName" class="grow" placeholder="z. B. −2 auf Angriffe">
+      <input id="cdR" style="width:78px" inputmode="numeric" placeholder="Rd"></div>
+    <button class="btn-acc btn-sm" style="width:100%;margin-top:8px"
+      onclick="addCond('${cid}', document.getElementById('cdName').value, document.getElementById('cdR').value)">Hinzufügen</button>
+    ${c.conds.length?`<h3 style="margin-top:14px">Aktiv</h3><div>${c.conds.map((k,i)=>condHtml(cid,k,i)).join("")}</div>`:""}
+    <button class="btn-sm" style="width:100%;margin-top:14px" onclick="closeModal()">Schliessen</button>`);
+}
+function addCond(cid, name, r){
+  name = String(name||"").trim();
+  if(!name){ toast("Kein Name"); return; }
+  const c = S.combat.order.find(x=>x.id===cid);
+  snap("Zustand "+name);
+  let rounds = null;
+  if(r===undefined){
+    const a = prompt("Dauer in Runden (leer = unbegrenzt):","");
+    if(a===null){ undoStack.pop(); return; }
+    rounds = String(a).trim()===""?null:Math.max(1,num(a,1));
+  } else {
+    rounds = String(r).trim()===""?null:Math.max(1,num(r,1));
+  }
+  c.conds.push({name:name, r:rounds});
+  save(); closeModal(); renderKampf();
+}
+function delCond(cid,i){
+  const c = S.combat.order.find(x=>x.id===cid);
+  snap("Zustand entfernt");
+  c.conds.splice(i,1); save(); closeModal(); renderKampf();
+}
+
+/* ======================= Modal-Gerüst ======================= */
+function modal(html){
+  document.getElementById("modals").innerHTML =
+    `<div class="ov" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`;
+}
+function closeModal(){ document.getElementById("modals").innerHTML=""; padVal=""; padTarget=null; }
+
+/* ======================= Zifferntasten ======================= */
+let padVal = "", padTarget = null, padMode = "dmg";
+function openPad(cid, mode){
+  padTarget = cid; padMode = mode; padVal = "";
+  const c = S.combat.order.find(x=>x.id===cid);
+  const title = mode==="dmg"?"Schaden":(mode==="heal"?"Heilung":"Chakra abziehen");
+  const quick = mode==="chak"?[1,2,3,5,10,15]:[1,3,5,10,15,20];
+  const cur = mode==="chak" ? `${c.ch} / ${c.chMax} Chakra` : `${c.hp} / ${c.hpMax} HP`;
+  modal(`<h2>${esc(c.name)}</h2>
+    <div class="muted" style="margin-bottom:10px">${title} · aktuell ${cur}</div>
+    <div class="disp" id="padDisp">0</div>
+    <div class="row wrap-r" style="margin-bottom:10px">
+      ${quick.map(q=>`<button class="btn-sm" style="flex:1" onclick="padQuick(${q})">${mode==="heal"?"+":"−"}${q}</button>`).join("")}
+    </div>
+    <div class="pad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="padKey('${n}')">${n}</button>`).join("")}
+      <button onclick="padKey('back')">⌫</button>
+      <button onclick="padKey('0')">0</button>
+      <button onclick="padKey('clear')">C</button>
+    </div>
+    <button class="btn-acc" style="width:100%;margin-top:10px;min-height:54px;font-size:18px"
+      onclick="padApply()">${title} übernehmen</button>
+    <button class="btn-sm" style="width:100%;margin-top:8px" onclick="closeModal()">Abbrechen</button>`);
+}
+function padKey(k){
+  if(k==="clear") padVal="";
+  else if(k==="back") padVal = padVal.slice(0,-1);
+  else if(padVal.length<4) padVal = (padVal==="0"?"":padVal)+k;
+  const d = document.getElementById("padDisp"); if(d) d.textContent = padVal||"0";
+}
+function padQuick(n){ padVal = String(n); padApply(); }
+function padApply(){
+  const v = num(padVal,0);
+  if(v<=0){ toast("Kein Wert eingegeben"); return; }
+  apply(padTarget, padMode, v);
+  closeModal();
+}
+function apply(cid, mode, v){
+  const c = S.combat.order.find(x=>x.id===cid);
+  if(!c) return;
+  snap((mode==="dmg"?"−":mode==="heal"?"+":"Chakra −")+v+" "+c.name);
+  if(mode==="chak"){
+    c.ch = Math.max(0, Math.min(c.chMax, c.ch - v));
+  }else if(mode==="heal"){
+    const was = c.down;
+    c.hp = Math.min(c.hpMax, c.hp + v);
+    if(was && c.hp>0){ c.down=false; toast(c.name+" ist wieder im Kampf"); }
+  }else{
+    c.hp = Math.max(0, c.hp - v);
+    if(c.hp===0 && !c.down){
+      c.down = true;
+      if(S.combat.curId===cid){
+        const nxt = S.combat.order.find(x=>!x.down);
+        S.combat.curId = nxt ? nxt.id : null;
+      }
+      toast(c.name+" ist gefallen");
+    } else if(c.thrHp!=null && c.hp<=c.thrHp && c.hp>0 && c.thrTxt){
+      toast("⚠ "+c.name+" — "+c.thrTxt, 5000);
+    }
+  }
+  save(); renderKampf();
+}
+function revive(cid){
+  const c = S.combat.order.find(x=>x.id===cid);
+  snap("Zurückgeholt: "+c.name);
+  c.hp = Math.max(1, Math.floor(c.hpMax/2));
+  c.down = false; c.conds = [];
+  save(); renderKampf(); toast(c.name+" zurückgeholt mit "+c.hp+" HP");
+}
+function removeCmb(cid){
+  const c = S.combat.order.find(x=>x.id===cid);
+  if(!confirm("„"+c.name+"“ ganz aus dem Kampf entfernen?")) return;
+  snap("Entfernt: "+c.name);
+  S.combat.order = S.combat.order.filter(x=>x.id!==cid);
+  if(S.combat.curId===cid){ const n = S.combat.order.find(x=>!x.down); S.combat.curId = n?n.id:null; }
+  save(); renderKampf();
+}
+
+/* ======================= Gegner mitten im Kampf ======================= */
+function openAdd(){
+  const groups = S.scenes.map(s=>({s:s, es:s.enemies}))
+    .filter(g=>g.es.length)
+    .map(g=>`<h3 style="margin-top:12px">${esc(g.s.name)}</h3>
+      ${g.es.map(e=>`<button class="btn-sm" style="width:100%;text-align:left;margin-bottom:6px"
+        onclick="addMid('${g.s.id}','${e.id}')">
+        ${esc(e.name)} <span class="tiny">· ${e.hp} HP · AC ${e.ac}${e.reserve?" · Reserve":""}</span>
+      </button>`).join("")}`).join("");
+  modal(`<h2>Gegner hinzufügen</h2>
+    <p class="muted">Wird mit W20 + Bonus einsortiert.</p>
+    ${groups||'<p class="muted">Keine Gegner vorbereitet.</p>'}
+    <button class="btn-sm" style="width:100%;margin-top:14px" onclick="closeModal()">Abbrechen</button>`);
+}
+function addMid(sid, eid){
+  const e = sceneById(sid).enemies.find(x=>x.id===eid);
+  snap("Hinzugefügt: "+e.name);
+  const same = S.combat.order.filter(c=>c.tplId===eid).length;
+  const ini = d20() + (e.ini||0);
+  const c = {id:uid(), type:"enemy", tplId:eid, name: same? e.name+" "+(same+1) : e.name,
+    ini:ini, ac:e.ac, hp:e.hp, hpMax:e.hp,
+    ch:(e.chakra==null?null:e.chakra), chMax:(e.chakra==null?null:e.chakra),
+    note:e.note||"", thrHp:(e.thrHp==null?null:e.thrHp), thrTxt:e.thrTxt||"", conds:[], down:false};
+  let at = S.combat.order.findIndex(x=>x.ini < ini);
+  if(at<0) at = S.combat.order.length;
+  S.combat.order.splice(at, 0, c);
+  if(!S.combat.curId) S.combat.curId = c.id;
+  save(); closeModal(); renderKampf();
+  toast(c.name+" eingefügt mit Initiative "+ini);
+}
+
+/* ======================= Wake Lock ======================= */
+async function requestWake(){
+  try{
+    if("wakeLock" in navigator && !wakeLock){
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", ()=>{ wakeLock=null; });
+    }
+  }catch(e){ /* nicht verfügbar (z. B. file://) — kein Fehler */ }
+}
+function releaseWake(){ if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock=null; } }
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && S.combat) requestWake();
+});
+
+/* ======================= Start ======================= */
+load();
+renderKampf(); renderScenes(); renderPlayers();
+if(S.combat) requestWake();
+window.addEventListener("keydown", e=>{
+  if(e.target.matches("input,textarea")) return;
+  if(e.key===" "&&S.combat&&!document.querySelector(".ov")){ e.preventDefault(); nextTurn(); }
+  if(e.key==="Escape") closeModal();
+});
+</script>
+</body>
+</html>
